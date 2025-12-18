@@ -319,8 +319,8 @@ import Layout from '../layouts/Layout.astro';
             </div>
           </div>
           <div class="carousel-dots" id="carouselDots">
-            <button class="carousel-dot active" data-index="0"></button>
-            <button class="carousel-dot" data-index="1"></button>
+            <button class="carousel-dot" data-index="0"></button>
+            <button class="carousel-dot active" data-index="1"></button>
             <button class="carousel-dot" data-index="2"></button>
           </div>
         </div>
@@ -1485,8 +1485,8 @@ import Layout from '../layouts/Layout.astro';
     }
     
     .carousel-slide .phone-frame {
-      width: 280px !important;
-      height: 570px !important;
+      width: 240px !important;
+      height: 490px !important;
     }
     
     .carousel-dots {
@@ -1828,9 +1828,6 @@ import Layout from '../layouts/Layout.astro';
   const carouselSlides = document.querySelectorAll('.carousel-slide');
   
   if (carouselTrack && carouselDots.length > 0 && carouselSlides.length > 0) {
-    // Set initial active slide
-    carouselSlides[0].classList.add('active');
-    
     // Update dots and active slide on scroll
     const updateCarousel = () => {
       const scrollLeft = carouselTrack.scrollLeft;
@@ -1859,7 +1856,14 @@ import Layout from '../layouts/Layout.astro';
       });
     });
     
-    // Initial update
-    setTimeout(updateCarousel, 100);
+    // Start on middle slide (MATCH - index 1)
+    setTimeout(() => {
+      const slideWidth = carouselSlides[0].offsetWidth;
+      carouselTrack.scrollTo({
+        left: slideWidth * 1,
+        behavior: 'instant'
+      });
+      updateCarousel();
+    }, 100);
   }
 </script>
