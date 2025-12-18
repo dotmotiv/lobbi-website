@@ -1443,6 +1443,7 @@ import Layout from '../layouts/Layout.astro';
     .mobile-carousel {
       display: block;
       position: relative;
+      overflow: hidden;
     }
     
     .carousel-track {
@@ -1452,8 +1453,9 @@ import Layout from '../layouts/Layout.astro';
       -webkit-overflow-scrolling: touch;
       scrollbar-width: none;
       -ms-overflow-style: none;
-      padding: 40px 0 60px;
+      padding: 40px 20px 60px;
       scroll-behavior: smooth;
+      gap: 0;
     }
     
     .carousel-track::-webkit-scrollbar {
@@ -1461,25 +1463,24 @@ import Layout from '../layouts/Layout.astro';
     }
     
     .carousel-slide {
-      flex: 0 0 70%;
+      flex: 0 0 80%;
       scroll-snap-align: center;
       display: flex;
       justify-content: center;
       align-items: center;
       transition: transform 0.3s ease, opacity 0.3s ease;
-      opacity: 0.4;
-      transform: scale(0.7);
-      margin: 0 -8%;
+      opacity: 0.5;
+      transform: scale(0.85);
       position: relative;
       z-index: 1;
     }
     
     .carousel-slide:first-child {
-      margin-left: 15%;
+      margin-left: 10%;
     }
     
     .carousel-slide:last-child {
-      margin-right: 15%;
+      margin-right: 10%;
     }
     
     .carousel-slide.active {
