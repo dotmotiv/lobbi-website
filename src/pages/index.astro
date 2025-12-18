@@ -238,8 +238,8 @@ import Layout from '../layouts/Layout.astro';
           <div class="section-line section-line-secondary"></div>
         </div>
         
-        <!-- App Screenshots -->
-        <div class="app-showcase reveal">
+        <!-- App Screenshots - Desktop -->
+        <div class="app-showcase app-showcase-desktop reveal">
           <div class="phone-mockup phone-left">
             <div class="phone-frame">
               <div class="phone-notch"></div>
@@ -278,6 +278,50 @@ import Layout from '../layouts/Layout.astro';
               </div>
             </div>
             <div class="phone-shadow"></div>
+          </div>
+        </div>
+        
+        <!-- App Screenshots - Mobile Carousel -->
+        <div class="mobile-carousel reveal">
+          <div class="carousel-track" id="carouselTrack">
+            <div class="carousel-slide">
+              <div class="phone-frame">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                  <div class="screen-placeholder">
+                    <span class="screen-label">RECRUIT</span>
+                    <p class="screen-desc">Swipe through profiles</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="carousel-slide">
+              <div class="phone-frame phone-frame-featured">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                  <div class="screen-placeholder screen-placeholder-featured">
+                    <span class="screen-label">MATCH</span>
+                    <p class="screen-desc">Find your squad</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="carousel-slide">
+              <div class="phone-frame">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                  <div class="screen-placeholder">
+                    <span class="screen-label">CHAT</span>
+                    <p class="screen-desc">Coordinate games</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="carousel-dots" id="carouselDots">
+            <button class="carousel-dot active" data-index="0"></button>
+            <button class="carousel-dot" data-index="1"></button>
+            <button class="carousel-dot" data-index="2"></button>
           </div>
         </div>
         
@@ -1386,15 +1430,99 @@ import Layout from '../layouts/Layout.astro';
     filter: blur(30px);
   }
   
+  /* Mobile Carousel */
+  .mobile-carousel {
+    display: none;
+  }
+  
   @media (max-width: 768px) {
-    .app-showcase {
-      flex-direction: column;
-    }
-    .phone-left, .phone-right {
+    .app-showcase-desktop {
       display: none;
     }
-    .phone-center {
-      transform: none;
+    
+    .mobile-carousel {
+      display: block;
+      position: relative;
+    }
+    
+    .carousel-track {
+      display: flex;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      padding: 40px 0 60px;
+      scroll-behavior: smooth;
+    }
+    
+    .carousel-track::-webkit-scrollbar {
+      display: none;
+    }
+    
+    .carousel-slide {
+      flex: 0 0 75%;
+      scroll-snap-align: center;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+      opacity: 0.4;
+      transform: scale(0.85);
+    }
+    
+    .carousel-slide:first-child {
+      margin-left: 12.5%;
+    }
+    
+    .carousel-slide:last-child {
+      margin-right: 12.5%;
+    }
+    
+    .carousel-slide.active {
+      opacity: 1;
+      transform: scale(1);
+    }
+    
+    .carousel-slide .phone-frame {
+      width: 280px !important;
+      height: 570px !important;
+    }
+    
+    .carousel-dots {
+      position: absolute;
+      bottom: 20px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      z-index: 20;
+      pointer-events: none;
+    }
+    
+    .carousel-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      background: transparent;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      padding: 0;
+      pointer-events: auto;
+    }
+    
+    .carousel-dot.active {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      width: 24px;
+      border-radius: 4px;
+      box-shadow: 0 0 10px rgba(255, 70, 85, 0.5);
+    }
+    
+    .carousel-dot:not(.active):hover {
+      border-color: rgba(255, 255, 255, 0.6);
     }
   }
 
@@ -1693,4 +1821,45 @@ import Layout from '../layouts/Layout.astro';
       }
     });
   });
+  
+  // Mobile Carousel
+  const carouselTrack = document.getElementById('carouselTrack');
+  const carouselDots = document.querySelectorAll('.carousel-dot');
+  const carouselSlides = document.querySelectorAll('.carousel-slide');
+  
+  if (carouselTrack && carouselDots.length > 0 && carouselSlides.length > 0) {
+    // Set initial active slide
+    carouselSlides[0].classList.add('active');
+    
+    // Update dots and active slide on scroll
+    const updateCarousel = () => {
+      const scrollLeft = carouselTrack.scrollLeft;
+      const slideWidth = carouselSlides[0].offsetWidth;
+      const activeIndex = Math.round(scrollLeft / slideWidth);
+      
+      carouselDots.forEach((dot, index) => {
+        dot.classList.toggle('active', index === activeIndex);
+      });
+      
+      carouselSlides.forEach((slide, index) => {
+        slide.classList.toggle('active', index === activeIndex);
+      });
+    };
+    
+    carouselTrack.addEventListener('scroll', updateCarousel);
+    
+    // Click dots to navigate
+    carouselDots.forEach((dot, index) => {
+      dot.addEventListener('click', () => {
+        const slideWidth = carouselSlides[0].offsetWidth;
+        carouselTrack.scrollTo({
+          left: slideWidth * index,
+          behavior: 'smooth'
+        });
+      });
+    });
+    
+    // Initial update
+    setTimeout(updateCarousel, 100);
+  }
 </script>
