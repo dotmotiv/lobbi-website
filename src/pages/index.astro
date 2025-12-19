@@ -53,7 +53,7 @@ import Layout from '../layouts/Layout.astro';
           </h1>
           
           <!-- Tagline -->
-          <p class="tagline animate-hero-tagline">FIND YOUR SQUAD. ON YOUR SCHEDULE.</p>
+          <p class="tagline animate-hero-tagline">FIND YOUR SQUAD. ON YOUR SCHEDULE. AGES 25+.</p>
           
           <!-- CTA Section -->
           <div class="hero-cta-section animate-hero-cta">
@@ -396,9 +396,9 @@ import Layout from '../layouts/Layout.astro';
           </div>
           
           <div class="footer-links">
-            <a href="#" class="footer-link">PRIVACY</a>
-            <a href="#" class="footer-link">TERMS</a>
-            <a href="#" class="footer-link">CONTACT</a>
+            <a href="/privacy" class="footer-link">PRIVACY</a>
+            <a href="/terms" class="footer-link">TERMS</a>
+            <a href="mailto:support@lobbi.app" class="footer-link">CONTACT</a>
           </div>
           
           <div class="footer-social">
@@ -556,9 +556,9 @@ import Layout from '../layouts/Layout.astro';
     display: grid;
     grid-template-columns: 1fr;
     gap: 48px;
-    max-width: 1400px;
+    max-width: 1280px;
     margin: 0 auto;
-    padding: 140px 48px 120px;
+    padding: 140px 64px 120px;
     min-height: 100vh;
     align-items: center;
   }
@@ -583,7 +583,7 @@ import Layout from '../layouts/Layout.astro';
   /* Hero Phone Section */
   .hero-phone {
     display: flex;
-    justify-content: center;
+    justify-content: flex-end;
     align-items: center;
     perspective: 1000px;
   }
@@ -854,6 +854,19 @@ import Layout from '../layouts/Layout.astro';
   
   @media (max-width: 1023px) {
     .tagline {
+      margin-bottom: 24px;
+    }
+  }
+  
+  .hero-subtitle {
+    font-size: 1.1rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 40px;
+    letter-spacing: 0.02em;
+  }
+  
+  @media (max-width: 1023px) {
+    .hero-subtitle {
       margin-bottom: 48px;
     }
   }

@@ -1,0 +1,254 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Privacy Policy - Lobbi">
+  <main>
+    <!-- Header -->
+    <header class="fixed top-0 left-0 right-0 z-50 header-blur">
+      <div class="header-container">
+        <a href="/" class="header-logo-link">
+          <img src="/lobbi-logo-transparent.png" alt="Lobbi" class="header-logo" />
+        </a>
+        <a href="/" class="back-link">← Back to Home</a>
+      </div>
+    </header>
+
+    <!-- Content -->
+    <section class="legal-content">
+      <div class="legal-container">
+        <h1 class="legal-title">PRIVACY POLICY</h1>
+        <div class="legal-meta">
+          <p>Effective Date: December 1, 2025</p>
+          <p>Last Updated: December 1, 2025</p>
+        </div>
+        
+        <p class="legal-intro">
+          This Privacy Policy describes how Codifiq LLC, a California company, collects, uses, stores, and protects personal information in connection with the Lobbi App.
+        </p>
+
+        <div class="legal-section">
+          <h2>1. INFORMATION WE COLLECT</h2>
+          <p>
+            Lobbi collects personal information necessary to operate the App, including authentication data received from third-party OAuth providers, profile information provided during onboarding, gaming preferences, device and session data, user-generated content, and moderation-related information.
+          </p>
+          <p>
+            <strong>Authentication data</strong> may include your email address, display name, profile image, and provider-specific identifiers.
+          </p>
+          <p>
+            <strong>Profile information</strong> may include your name, gamertag, date of birth (for age verification), optional bio and avatar, preferences, availability, and optional Parent Shield data.
+          </p>
+          <p>
+            <strong>Device and session data</strong> may include device identifiers, operating system details, app version, IP address, authentication method, and timestamps, which are used for security, fraud prevention, and session management.
+          </p>
+        </div>
+
+        <div class="legal-section">
+          <h2>2. USER-GENERATED CONTENT AND COMMUNICATIONS</h2>
+          <p>
+            Lobbi processes messages, squad requests, matches, and interaction data to enable communication and matching functionality. These communications are stored and processed as part of the App's core services.
+          </p>
+        </div>
+
+        <div class="legal-section">
+          <h2>3. HOW WE USE PERSONAL INFORMATION</h2>
+          <p>We use personal information to:</p>
+          <ul>
+            <li>Provide and operate the App;</li>
+            <li>Match users and enable communication;</li>
+            <li>Maintain safety, moderation, and security;</li>
+            <li>Prevent fraud and abuse;</li>
+            <li>Improve features and user experience.</li>
+          </ul>
+          <p>We do not sell personal information.</p>
+        </div>
+
+        <div class="legal-section">
+          <h2>4. PARENT SHIELD DATA</h2>
+          <p>
+            Parent Shield information consists only of optional, self-reported age ranges of a user's children. Lobbi does not collect personal data about children and does not knowingly process information that would be considered children's personal data under applicable laws.
+          </p>
+        </div>
+
+        <div class="legal-section">
+          <h2>5. THIRD-PARTY SERVICES</h2>
+          <p>
+            Lobbi uses trusted third-party service providers for infrastructure and authentication, including Supabase, Google, Apple, Discord, and IP detection services. These providers process data only as necessary to perform their services.
+          </p>
+        </div>
+
+        <div class="legal-section">
+          <h2>6. DATA RETENTION AND DELETION</h2>
+          <p>
+            Personal information is retained for as long as your account remains active. When an account is deleted, associated data is removed or anonymized, subject to legal, security, or compliance requirements.
+          </p>
+        </div>
+
+        <div class="legal-section">
+          <h2>7. DATA SECURITY</h2>
+          <p>
+            Lobbi implements technical and organizational safeguards designed to protect personal information, including access controls and database-level security policies.
+          </p>
+        </div>
+
+        <div class="legal-section">
+          <h2>8. YOUR PRIVACY RIGHTS</h2>
+          <p>
+            California residents have rights under the CCPA and CPRA, including the right to access, delete, and correct personal information. EU users may have additional rights under GDPR.
+          </p>
+          <p>
+            Requests may be submitted to <a href="mailto:privacy@lobbi.app">privacy@lobbi.app</a>.
+          </p>
+        </div>
+
+        <div class="legal-section">
+          <h2>9. CHILDREN'S PRIVACY</h2>
+          <p>
+            Lobbi is intended only for users aged 25 and older and does not knowingly collect personal information from minors.
+          </p>
+        </div>
+
+        <div class="legal-section">
+          <h2>10. CHANGES TO THIS POLICY</h2>
+          <p>
+            We may update this Privacy Policy from time to time. Continued use of the App constitutes acceptance of the updated policy.
+          </p>
+        </div>
+
+        <div class="legal-section">
+          <h2>11. CONTACT</h2>
+          <p>
+            <strong>Company:</strong> Codifiq LLC<br>
+            <strong>Email:</strong> <a href="mailto:privacy@lobbi.app">privacy@lobbi.app</a>
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+</Layout>
+
+<style>
+  .header-blur {
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    background: rgba(13, 17, 23, 0.8);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .header-container {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .header-logo-link {
+    display: flex;
+    align-items: center;
+  }
+
+  .header-logo {
+    height: 32px;
+    width: auto;
+  }
+
+  .back-link {
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    font-size: 14px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    transition: color 0.2s ease;
+  }
+
+  .back-link:hover {
+    color: var(--color-primary);
+  }
+
+  .legal-content {
+    min-height: 100vh;
+    padding: 140px 24px 80px;
+    background: var(--color-background);
+  }
+
+  .legal-container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .legal-title {
+    font-family: 'Clash Display', sans-serif;
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 700;
+    color: var(--color-text);
+    margin-bottom: 24px;
+    letter-spacing: 2px;
+  }
+
+  .legal-meta {
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    margin-bottom: 40px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .legal-meta p {
+    margin: 4px 0;
+  }
+
+  .legal-intro {
+    font-size: 1.1rem;
+    color: var(--color-text-secondary);
+    line-height: 1.8;
+    margin-bottom: 48px;
+  }
+
+  .legal-section {
+    margin-bottom: 40px;
+  }
+
+  .legal-section h2 {
+    font-family: 'Clash Display', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: 16px;
+    letter-spacing: 1px;
+  }
+
+  .legal-section p {
+    color: var(--color-text-secondary);
+    line-height: 1.8;
+    margin-bottom: 16px;
+  }
+
+  .legal-section ul {
+    color: var(--color-text-secondary);
+    line-height: 1.8;
+    margin: 16px 0;
+    padding-left: 24px;
+    list-style-type: disc;
+  }
+
+  .legal-section li {
+    margin-bottom: 8px;
+  }
+
+  .legal-section a {
+    color: var(--color-primary);
+    text-decoration: none;
+    transition: opacity 0.2s ease;
+  }
+
+  .legal-section a:hover {
+    opacity: 0.8;
+  }
+
+  .legal-section strong {
+    color: var(--color-text);
+  }
+</style>
+
