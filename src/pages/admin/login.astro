@@ -226,13 +226,22 @@ if (details) {
   import { createSupabaseBrowserClient } from '../../lib/supabase-ssr';
 
   const supabase = createSupabaseBrowserClient();
-  const redirectTo = `${window.location.origin}/admin/auth/callback`;
+  
+  // Use full URL for production, dynamic for dev
+  const redirectTo = window.location.hostname === 'lobbiapp.com'
+    ? 'https://lobbiapp.com/admin/auth/callback'
+    : `${window.location.origin}/admin/auth/callback`;
 
   // Google Login
   document.getElementById('googleLogin')?.addEventListener('click', async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo }
+      options: { 
+        redirectTo,
+        queryParams: {
+          redirect_to: redirectTo
+        }
+      }
     });
     if (error) console.error('Google login error:', error);
   });
@@ -241,7 +250,12 @@ if (details) {
   document.getElementById('appleLogin')?.addEventListener('click', async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'apple',
-      options: { redirectTo }
+      options: { 
+        redirectTo,
+        queryParams: {
+          redirect_to: redirectTo
+        }
+      }
     });
     if (error) console.error('Apple login error:', error);
   });
@@ -250,7 +264,12 @@ if (details) {
   document.getElementById('discordLogin')?.addEventListener('click', async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'discord',
-      options: { redirectTo }
+      options: { 
+        redirectTo,
+        queryParams: {
+          redirect_to: redirectTo
+        }
+      }
     });
     if (error) console.error('Discord login error:', error);
   });
