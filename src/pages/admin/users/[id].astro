@@ -1,0 +1,470 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getAdminSession } from '../../../lib/adminAuth';
+import { getUserById, getReportStats, supabase } from '../../../lib/supabase';
+
+// Check admin auth - redirect if not authenticated
+const session = await getAdminSession(Astro);
+if (!session) {
+  return Astro.redirect('/admin/login');
+}
+
+const { id } = Astro.params;
+
+// Fetch user from database
+const user = await getUserById(id as string);
+
+// Redirect if not found
+if (!user) {
+  return Astro.redirect('/admin/users');
+}
+
+// Get report stats for sidebar badge
+const reportStats = await getReportStats();
+
+// Get reports for this user
+const { data: userReports } = await supabase
+  .from('reports')
+  .select('id, reason, status, created_at, reporter_id')
+  .eq('reported_user_id', id)
+  .order('created_at', { ascending: false });
+
+// Fetch game names if user has games
+let gameNames: string[] = [];
+if (user.games && user.games.length > 0) {
+  const { data: gamesData } = await supabase
+    .from('games')
+    .select('id, title')
+    .in('id', user.games);
+  
+  gameNames = gamesData?.map(g => g.title) || [];
+}
+
+// Helper functions
+function formatDate(dateStr: string | null) {
+  if (!dateStr) return 'N/A';
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', { 
+    month: 'short', 
+    day: 'numeric', 
+    year: 'numeric'
+  });
+}
+
+function formatDateTime(dateStr: string | null) {
+  if (!dateStr) return 'N/A';
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', { 
+    month: 'short', 
+    day: 'numeric', 
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+---
+
+<AdminLayout title={`User: ${user.name || user.gamertag || 'Unknown'}`} currentPage="users" session={session} pendingReportsCount={reportStats.pending}>
+  <div class="user-detail">
+    <!-- Back Link -->
+    <a href="/admin/users" class="back-link">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+      Back to Users
+    </a>
+
+    <!-- User Header -->
+    <div class="user-header">
+      <div class="user-avatar-large">
+        {user.avatar ? (
+          <img src={user.avatar} alt={user.name || 'User'} />
+        ) : (
+          <span>{(user.name || user.gamertag || 'U').charAt(0).toUpperCase()}</span>
+        )}
+      </div>
+      <div class="user-header-info">
+        <h1 class="user-title">{user.name || 'Unknown'}</h1>
+        <div class="user-meta">
+          <span class="user-gamertag">{user.gamertag || 'No gamertag'}</span>
+          <span class="meta-divider">•</span>
+          <span class="user-email">{user.email || 'No email'}</span>
+          <span class="meta-divider">•</span>
+          <span class="user-joined">Joined {formatDate(user.created_at)}</span>
+        </div>
+      </div>
+      <div class="user-status-badge active">Active</div>
+    </div>
+
+    <!-- User Details Grid -->
+    <div class="user-details-grid">
+      <!-- Basic Information -->
+      <div class="detail-card">
+        <h3 class="card-title">Basic Information</h3>
+        <div class="detail-list">
+          <div class="detail-item">
+            <span class="detail-label">Name</span>
+            <span class="detail-value">{user.name || 'N/A'}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Email</span>
+            <span class="detail-value">{user.email || 'N/A'}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Gamertag</span>
+            <span class="detail-value">{user.gamertag || 'N/A'}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Bio</span>
+            <span class="detail-value">{user.bio || 'No bio'}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Joined</span>
+            <span class="detail-value">{formatDateTime(user.created_at)}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gaming Preferences -->
+      <div class="detail-card">
+        <h3 class="card-title">Gaming Preferences</h3>
+        <div class="detail-list">
+          {gameNames.length > 0 ? (
+            <div class="detail-item">
+              <span class="detail-label">Games</span>
+              <div class="detail-tags">
+                {gameNames.map((gameName: string) => (
+                  <span class="tag">{gameName}</span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {user.platforms && user.platforms.length > 0 ? (
+            <div class="detail-item">
+              <span class="detail-label">Platforms</span>
+              <div class="detail-tags">
+                {user.platforms.map((platform: string) => (
+                  <span class="tag">{platform}</span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {user.game_type ? (
+            <div class="detail-item">
+              <span class="detail-label">Game Type</span>
+              <span class="detail-value">{user.game_type}</span>
+            </div>
+          ) : null}
+          {user.preferred_language ? (
+            <div class="detail-item">
+              <span class="detail-label">Preferred Language</span>
+              <span class="detail-value">{user.preferred_language}</span>
+            </div>
+          ) : null}
+          {user.region ? (
+            <div class="detail-item">
+              <span class="detail-label">Region</span>
+              <span class="detail-value">{user.region}</span>
+            </div>
+          ) : null}
+          {!user.games?.length && !user.platforms?.length && !user.game_type && !user.preferred_language && !user.region && (
+            <p class="empty-info">No gaming preferences set</p>
+          )}
+        </div>
+      </div>
+
+      <!-- Reports -->
+      <div class="detail-card">
+        <h3 class="card-title">Reports ({userReports?.length || 0})</h3>
+        {userReports && userReports.length > 0 ? (
+          <div class="reports-list">
+            {userReports.map((report: any) => (
+              <a href={`/admin/reports/${report.id}`} class="report-item">
+                <div class={`report-type ${report.reason?.toLowerCase() || 'other'}`}>
+                  {report.reason || 'Other'}
+                </div>
+                <div class="report-info">
+                  <span class="report-status">{report.status}</span>
+                  <span class="report-date">{formatDateTime(report.created_at)}</span>
+                </div>
+                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <p class="empty-info">No reports for this user</p>
+        )}
+      </div>
+    </div>
+  </div>
+</AdminLayout>
+
+<style>
+  .user-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--admin-text-secondary, #8b949e);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: color 0.2s ease;
+    margin-bottom: 8px;
+  }
+
+  .back-link:hover {
+    color: var(--admin-primary, #ff4655);
+  }
+
+  .back-link svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .user-header {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 24px;
+    background: rgba(22, 27, 34, 0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+  }
+
+  .user-avatar-large {
+    width: 80px;
+    height: 80px;
+    min-width: 80px;
+    background: linear-gradient(135deg, var(--admin-primary, #ff4655) 0%, #ff6b7a 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .user-avatar-large img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+  }
+
+  .user-avatar-large span {
+    color: white;
+    font-weight: 600;
+    font-size: 32px;
+  }
+
+  .user-header-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .user-title {
+    font-family: 'Clash Display', sans-serif;
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--admin-text, #e6edf3);
+    margin: 0;
+  }
+
+  .user-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--admin-text-secondary, #8b949e);
+    flex-wrap: wrap;
+  }
+
+  .user-gamertag {
+    color: var(--admin-primary, #ff4655);
+    font-weight: 500;
+  }
+
+  .meta-divider {
+    opacity: 0.5;
+  }
+
+  .user-status-badge {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .user-status-badge.active {
+    background: rgba(63, 185, 80, 0.15);
+    color: #3fb950;
+  }
+
+  .user-details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 24px;
+  }
+
+  .detail-card {
+    background: rgba(22, 27, 34, 0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 24px;
+  }
+
+  .card-title {
+    font-family: 'Clash Display', sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--admin-text, #e6edf3);
+    margin-bottom: 20px;
+  }
+
+  .detail-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .detail-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--admin-text-secondary, #8b949e);
+  }
+
+  .detail-value {
+    font-size: 14px;
+    color: var(--admin-text, #e6edf3);
+  }
+
+  .detail-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .tag {
+    padding: 4px 12px;
+    background: rgba(255, 70, 85, 0.15);
+    border: 1px solid rgba(255, 70, 85, 0.3);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--admin-primary, #ff4655);
+    font-weight: 500;
+  }
+
+  .empty-info {
+    color: var(--admin-text-secondary, #8b949e);
+    font-size: 14px;
+    font-style: italic;
+  }
+
+  .reports-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .report-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: rgba(13, 17, 23, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s ease;
+  }
+
+  .report-item:hover {
+    border-color: var(--admin-primary, #ff4655);
+    background: rgba(255, 70, 85, 0.05);
+  }
+
+  .report-type {
+    padding: 4px 10px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+
+  .report-type.harassment {
+    background: rgba(248, 81, 73, 0.15);
+    color: #f85149;
+  }
+
+  .report-type.spam {
+    background: rgba(210, 153, 34, 0.15);
+    color: #d29922;
+  }
+
+  .report-type.other {
+    background: rgba(125, 133, 144, 0.15);
+    color: var(--admin-text-secondary, #8b949e);
+  }
+
+  .report-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .report-status {
+    font-size: 12px;
+    color: var(--admin-text-secondary, #8b949e);
+    text-transform: capitalize;
+  }
+
+  .report-date {
+    font-size: 11px;
+    color: var(--admin-text-secondary, #8b949e);
+  }
+
+  .chevron {
+    width: 18px;
+    height: 18px;
+    color: var(--admin-text-secondary, #8b949e);
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 768px) {
+    .user-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .user-details-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+

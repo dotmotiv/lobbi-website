@@ -1,0 +1,82 @@
+---
+import { createSupabaseServerClient } from '../../../lib/supabase-ssr';
+
+// Create SSR client that can read/write cookies
+const supabase = createSupabaseServerClient(Astro.cookies, Astro.request);
+
+// Get the auth code from URL (PKCE flow)
+const code = Astro.url.searchParams.get('code');
+const errorParam = Astro.url.searchParams.get('error');
+const errorDescription = Astro.url.searchParams.get('error_description');
+
+// Debug logging
+console.log('Callback received:', { 
+  code: code ? 'present' : 'missing', 
+  error: errorParam,
+  errorDescription,
+  fullUrl: Astro.url.toString()
+});
+
+// Handle error from OAuth provider
+if (errorParam) {
+  console.error('OAuth error:', errorParam, errorDescription);
+  return Astro.redirect(`/admin/login?error=auth_failed&details=${encodeURIComponent(errorDescription || errorParam)}`);
+}
+
+if (code) {
+  try {
+    // Exchange code for session - this will automatically set cookies via the SSR client
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    
+    console.log('Exchange result:', { 
+      hasSession: !!data?.session, 
+      userId: data?.session?.user?.id,
+      error: error?.message 
+    });
+    
+    if (error) {
+      console.error('Exchange error:', error);
+      return Astro.redirect(`/admin/login?error=auth_failed&details=${encodeURIComponent(error.message)}`);
+    }
+    
+    if (data.session) {
+      // IMPORTANT: Use getUser() to ensure session is fully established in cookies
+      // This is the same pattern used by getAdminSession which works
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        console.error('getUser error after exchange:', userError);
+        return Astro.redirect(`/admin/login?error=auth_failed&details=${encodeURIComponent(userError?.message || 'Session not established')}`);
+      }
+      
+      // Now check if user is an admin using the SSR client (which has the session context for RLS)
+      const { data: adminData, error: adminError } = await supabase
+        .from('admin_users')
+        .select('id, role')
+        .eq('user_id', user.id)
+        .single();
+      
+      const isAdmin = !!adminData && !adminError;
+      console.log('Admin check:', { userId: user.id, isAdmin, adminData, adminError: adminError?.message });
+      
+      if (isAdmin) {
+        // Redirect to admin dashboard
+        return Astro.redirect('/admin');
+      } else {
+        // User is not an admin - sign them out and redirect to login with error
+        console.log('User not in admin_users table, redirecting...');
+        await supabase.auth.signOut();
+        return Astro.redirect('/admin/login?error=not_admin');
+      }
+    }
+  } catch (err) {
+    console.error('Callback error:', err);
+    return Astro.redirect('/admin/login?error=auth_failed');
+  }
+}
+
+// If no code, redirect to login
+console.log('No code received, redirecting to login');
+return Astro.redirect('/admin/login?error=auth_failed');
+---
+

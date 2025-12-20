@@ -1,0 +1,452 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getAdminSession } from '../../lib/adminAuth';
+import { getDashboardStats, getRecentActivity, getReports, getReportStats } from '../../lib/supabase';
+
+// Check admin auth - redirect if not authenticated
+const session = await getAdminSession(Astro);
+if (!session) {
+  return Astro.redirect('/admin/login');
+}
+
+// Fetch dashboard data
+const stats = await getDashboardStats();
+const recentActivity = await getRecentActivity(5);
+const { reports: pendingReports } = await getReports({ status: 'pending', limit: 5 });
+const reportStats = await getReportStats();
+
+// Helper to format time ago
+function timeAgo(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+  return `${Math.floor(seconds / 86400)} days ago`;
+}
+---
+
+<AdminLayout title="Dashboard" currentPage="dashboard" session={session} pendingReportsCount={reportStats.pending}>
+  <div class="dashboard">
+    <!-- Stats Grid -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon users">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <div class="stat-content">
+          <span class="stat-value">{stats.totalUsers.toLocaleString()}</span>
+          <span class="stat-label">Total Users</span>
+        </div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+        </div>
+        <div class="stat-content">
+          <span class="stat-value">{stats.activeToday.toLocaleString()}</span>
+          <span class="stat-label">Active Today</span>
+        </div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon squads">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <div class="stat-content">
+          <span class="stat-value">{stats.totalMatches.toLocaleString()}</span>
+          <span class="stat-label">Total Matches</span>
+        </div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon reports">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
+            <line x1="4" y1="22" x2="4" y2="15"/>
+          </svg>
+        </div>
+        <div class="stat-content">
+          <span class="stat-value">{stats.pendingReports}</span>
+          <span class="stat-label">Pending Reports</span>
+        </div>
+        {stats.pendingReports > 0 && (
+          <span class="stat-trend negative">+{stats.pendingReports}</span>
+        )}
+      </div>
+    </div>
+    
+    <!-- Main Content Grid -->
+    <div class="content-grid">
+      <!-- Recent Activity -->
+      <div class="card activity-card">
+        <div class="card-header">
+          <h2 class="card-title">Recent Activity</h2>
+          <a href="/admin/users" class="card-link">View All</a>
+        </div>
+        <div class="activity-list">
+          {recentActivity.length === 0 ? (
+            <p class="empty-state">No recent activity</p>
+          ) : (
+            recentActivity.map((activity) => (
+              <div class="activity-item">
+                <div class={`activity-icon ${activity.type}`}>
+                  {activity.type === 'signup' && '👤'}
+                  {activity.type === 'match' && '🤝'}
+                  {activity.type === 'report' && '⚠️'}
+                </div>
+                <div class="activity-content">
+                  <p class="activity-text">{activity.description}</p>
+                  <span class="activity-time">{timeAgo(activity.time)}</span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+      
+      <!-- Pending Reports -->
+      <div class="card reports-card">
+        <div class="card-header">
+          <h2 class="card-title">Pending Reports</h2>
+          <a href="/admin/reports" class="card-link">View All</a>
+        </div>
+        <div class="reports-list">
+          {pendingReports.length === 0 ? (
+            <p class="empty-state">No pending reports 🎉</p>
+          ) : (
+            pendingReports.map((report: any) => (
+              <div class="report-item">
+                <div class={`report-type ${report.reason?.toLowerCase() || 'other'}`}>
+                  {report.reason || 'Other'}
+                </div>
+                <div class="report-content">
+                  <p class="report-text">{report.details?.slice(0, 50) || 'No details provided'}...</p>
+                  <span class="report-time">{timeAgo(report.created_at)}</span>
+                </div>
+                <a href={`/admin/reports/${report.id}`} class="report-action">Review</a>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+    
+  </div>
+</AdminLayout>
+
+<style>
+  .dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* Stats Grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+
+  @media (max-width: 1200px) {
+    .stats-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 600px) {
+    .stats-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .stat-card {
+    background: rgba(22, 27, 34, 0.6);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    position: relative;
+    transition: all 0.2s ease;
+  }
+  
+  .stat-card:hover {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(22, 27, 34, 0.8);
+  }
+
+  .stat-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .stat-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .stat-icon.users {
+    background: rgba(56, 139, 253, 0.15);
+    color: #388bfd;
+  }
+
+  .stat-icon.active {
+    background: rgba(63, 185, 80, 0.15);
+    color: #3fb950;
+  }
+
+  .stat-icon.squads {
+    background: rgba(163, 113, 247, 0.15);
+    color: #a371f7;
+  }
+
+  .stat-icon.reports {
+    background: rgba(248, 81, 73, 0.15);
+    color: #f85149;
+  }
+
+  .stat-content {
+    flex: 1;
+  }
+
+  .stat-value {
+    display: block;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--admin-text, #e6edf3);
+    font-family: 'Clash Display', sans-serif;
+    line-height: 1.2;
+  }
+
+  .stat-label {
+    font-size: 12px;
+    color: var(--admin-text-secondary, #8b949e);
+  }
+
+  .stat-trend {
+    position: absolute;
+    top: 50%;
+    right: 16px;
+    transform: translateY(-50%);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+
+  .stat-trend.positive {
+    background: rgba(63, 185, 80, 0.15);
+    color: #3fb950;
+  }
+
+  .stat-trend.negative {
+    background: rgba(248, 81, 73, 0.15);
+    color: #f85149;
+  }
+
+  /* Content Grid */
+  .content-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  @media (max-width: 1024px) {
+    .content-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .card {
+    background: rgba(22, 27, 34, 0.6);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 18px 20px;
+    transition: all 0.2s ease;
+  }
+  
+  .card:hover {
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+
+  .card-title {
+    font-family: 'Clash Display', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--admin-text, #e6edf3);
+    letter-spacing: 0.5px;
+  }
+
+  .card-link {
+    font-size: 13px;
+    color: var(--admin-primary, #ff4655);
+    text-decoration: none;
+  }
+
+  .card-link:hover {
+    text-decoration: underline;
+  }
+
+  /* Activity List */
+  .activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .activity-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .activity-icon {
+    width: 36px;
+    height: 36px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+
+  .activity-content {
+    flex: 1;
+  }
+
+  .empty-state {
+    color: var(--admin-text-secondary, #8b949e);
+    font-size: 14px;
+    text-align: center;
+    padding: 24px;
+  }
+
+  .activity-text {
+    font-size: 14px;
+    color: var(--admin-text, #e6edf3);
+    margin-bottom: 2px;
+  }
+
+  .activity-text strong {
+    color: var(--admin-primary, #ff4655);
+  }
+
+  .activity-time {
+    font-size: 12px;
+    color: var(--admin-text-secondary, #8b949e);
+  }
+
+  /* Reports List */
+  .reports-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .report-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: var(--admin-bg, #0d1117);
+    border-radius: 8px;
+  }
+
+  .report-type {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+
+  .report-type.harassment {
+    background: rgba(248, 81, 73, 0.15);
+    color: #f85149;
+  }
+
+  .report-type.spam {
+    background: rgba(210, 153, 34, 0.15);
+    color: #d29922;
+  }
+
+  .report-type.fake {
+    background: rgba(163, 113, 247, 0.15);
+    color: #a371f7;
+  }
+
+  .report-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .report-text {
+    font-size: 14px;
+    color: var(--admin-text, #e6edf3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .report-time {
+    font-size: 12px;
+    color: var(--admin-text-secondary, #8b949e);
+  }
+
+  .report-action {
+    padding: 6px 12px;
+    background: transparent;
+    border: 1px solid var(--admin-border, #30363d);
+    border-radius: 6px;
+    color: var(--admin-text, #e6edf3);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .report-action:hover {
+    background: var(--admin-card, #21262d);
+    border-color: var(--admin-primary, #ff4655);
+    color: var(--admin-primary, #ff4655);
+  }
+
+
+</style>
+

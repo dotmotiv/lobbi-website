@@ -1,0 +1,480 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getAdminSession } from '../../lib/adminAuth';
+import { getUsers, getReportStats } from '../../lib/supabase';
+
+// Check admin auth - redirect if not authenticated
+const session = await getAdminSession(Astro);
+if (!session) {
+  return Astro.redirect('/admin/login');
+}
+
+// Get query params
+const page = parseInt(Astro.url.searchParams.get('page') || '1');
+const search = Astro.url.searchParams.get('search') || '';
+const sortBy = Astro.url.searchParams.get('sort') || 'newest';
+const limit = 10;
+
+// Fetch users
+const { users, total } = await getUsers({ page, limit, search, sortBy });
+const totalPages = Math.ceil(total / limit);
+const reportStats = await getReportStats();
+
+// Format date
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return 'N/A';
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+---
+
+<AdminLayout title="User Management" currentPage="users" session={session} pendingReportsCount={reportStats.pending}>
+  <div class="users-page">
+    <!-- Search & Filters -->
+    <div class="toolbar">
+      <form class="search-box" method="get">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="text" name="search" placeholder="Search users by name, email, or gamertag..." value={search} />
+        <input type="hidden" name="sort" value={sortBy} />
+      </form>
+      <div class="filters">
+        <select id="sortBy" class="filter-select" onchange="window.location.href=`?sort=${this.value}&search=${new URLSearchParams(window.location.search).get('search') || ''}`">
+          <option value="newest" selected={sortBy === 'newest'}>Newest First</option>
+          <option value="oldest" selected={sortBy === 'oldest'}>Oldest First</option>
+          <option value="name" selected={sortBy === 'name'}>Name A-Z</option>
+        </select>
+      </div>
+    </div>
+    
+    <!-- Users Table -->
+    <div class="table-container">
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Gamertag</th>
+            <th>Joined</th>
+            <th>Status</th>
+            <th>Reports</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {users.length === 0 ? (
+            <tr>
+              <td colspan="6" class="empty-state">No users found</td>
+            </tr>
+          ) : (
+            users.map((user: any) => (
+              <tr>
+                <td>
+                  <div class="user-cell">
+                    <div class="user-avatar">
+                      {user.avatar ? (
+                        <img src={user.avatar} alt="" />
+                      ) : (
+                        <span>{(user.name || 'U').charAt(0).toUpperCase()}</span>
+                      )}
+                    </div>
+                    <div class="user-info">
+                      <span class="user-name">{user.name || 'Unknown'}</span>
+                      <span class="user-email">{user.email || 'No email'}</span>
+                    </div>
+                  </div>
+                </td>
+                <td><span class="gamertag">{user.gamertag || '-'}</span></td>
+                <td><span class="date">{formatDate(user.created_at)}</span></td>
+                <td><span class="status-badge active">Active</span></td>
+                <td>
+                  <span class={`report-count ${user.reportCount > 0 ? 'has-reports' : ''}`}>
+                    {user.reportCount || 0}
+                  </span>
+                </td>
+                <td>
+                  <div class="action-buttons">
+                    <a href={`/admin/users/${user.id}`} class="action-btn view" title="View Profile">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+    
+    <!-- Pagination -->
+    {totalPages > 1 && (
+      <div class="pagination">
+        <span class="pagination-info">
+          Showing {((page - 1) * limit) + 1}-{Math.min(page * limit, total)} of {total.toLocaleString()} users
+        </span>
+        <div class="pagination-buttons">
+          {page > 1 && (
+            <a href={`?page=${page - 1}&sort=${sortBy}&search=${search}`} class="page-btn">Previous</a>
+          )}
+          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+            const pageNum = i + 1;
+            return (
+              <a 
+                href={`?page=${pageNum}&sort=${sortBy}&search=${search}`} 
+                class={`page-btn ${pageNum === page ? 'active' : ''}`}
+              >
+                {pageNum}
+              </a>
+            );
+          })}
+          {totalPages > 5 && <span class="page-dots">...</span>}
+          {totalPages > 5 && (
+            <a href={`?page=${totalPages}&sort=${sortBy}&search=${search}`} class="page-btn">{totalPages}</a>
+          )}
+          {page < totalPages && (
+            <a href={`?page=${page + 1}&sort=${sortBy}&search=${search}`} class="page-btn">Next</a>
+          )}
+        </div>
+      </div>
+    )}
+  </div>
+</AdminLayout>
+
+<style>
+  .users-page {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* Toolbar */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .search-box {
+    flex: 1;
+    min-width: 300px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--admin-card, #21262d);
+    border: 1px solid var(--admin-border, #30363d);
+    border-radius: 10px;
+  }
+
+  .search-box svg {
+    width: 20px;
+    height: 20px;
+    color: var(--admin-text-secondary, #8b949e);
+  }
+
+  .search-box input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--admin-text, #e6edf3);
+    font-size: 14px;
+  }
+
+  .search-box input::placeholder {
+    color: var(--admin-text-secondary, #8b949e);
+  }
+
+  .filters {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .filter-select {
+    padding: 12px 16px;
+    background: var(--admin-card, #21262d);
+    border: 1px solid var(--admin-border, #30363d);
+    border-radius: 10px;
+    color: var(--admin-text, #e6edf3);
+    font-size: 14px;
+    cursor: pointer;
+    outline: none;
+  }
+
+  .filter-select:hover {
+    border-color: var(--admin-text-secondary, #8b949e);
+  }
+
+  /* Table */
+  .table-container {
+    background: var(--admin-card, #21262d);
+    border: 1px solid var(--admin-border, #30363d);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .users-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .users-table th {
+    text-align: left;
+    padding: 16px 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--admin-text-secondary, #8b949e);
+    border-bottom: 1px solid var(--admin-border, #30363d);
+    background: var(--admin-bg, #0d1117);
+  }
+
+  .users-table td {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--admin-border, #30363d);
+    font-size: 14px;
+  }
+
+  .users-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .users-table tr:hover {
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  /* User Cell */
+  .user-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .user-avatar {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    background: linear-gradient(135deg, var(--admin-primary, #ff4655) 0%, #ff6b7a 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+  }
+
+  .user-avatar span {
+    color: white;
+    font-weight: 600;
+    font-size: 16px;
+  }
+
+  .user-info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .user-name {
+    font-weight: 500;
+    color: var(--admin-text, #e6edf3);
+  }
+
+  .user-email {
+    font-size: 12px;
+    color: var(--admin-text-secondary, #8b949e);
+  }
+
+  .gamertag {
+    font-family: 'Clash Display', monospace;
+    font-weight: 500;
+    color: var(--admin-primary, #ff4655);
+  }
+
+  .date {
+    color: var(--admin-text-secondary, #8b949e);
+  }
+
+  /* Status Badge */
+  .status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: capitalize;
+  }
+
+  .status-badge.active {
+    background: rgba(63, 185, 80, 0.15);
+    color: #3fb950;
+  }
+
+  .status-badge.suspended {
+    background: rgba(210, 153, 34, 0.15);
+    color: #d29922;
+  }
+
+  .status-badge.banned {
+    background: rgba(248, 81, 73, 0.15);
+    color: #f85149;
+  }
+
+  /* Report Count */
+  .report-count {
+    font-weight: 600;
+  }
+
+  .report-count.warning {
+    color: #f85149;
+  }
+
+  /* Action Buttons */
+  .action-buttons {
+    display: flex;
+    gap: 8px;
+  }
+
+  .action-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--admin-bg, #0d1117);
+    border: 1px solid var(--admin-border, #30363d);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .action-btn svg {
+    width: 16px;
+    height: 16px;
+    color: var(--admin-text-secondary, #8b949e);
+  }
+
+  .action-btn:hover {
+    border-color: var(--admin-text-secondary, #8b949e);
+  }
+
+  .action-btn:hover svg {
+    color: var(--admin-text, #e6edf3);
+  }
+
+  .action-btn.view:hover {
+    border-color: #388bfd;
+  }
+
+  .action-btn.view:hover svg {
+    color: #388bfd;
+  }
+
+  .action-btn.warn:hover {
+    border-color: #d29922;
+  }
+
+  .action-btn.warn:hover svg {
+    color: #d29922;
+  }
+
+  .action-btn.suspend:hover,
+  .action-btn.ban:hover {
+    border-color: #f85149;
+  }
+
+  .action-btn.suspend:hover svg,
+  .action-btn.ban:hover svg {
+    color: #f85149;
+  }
+
+  .action-btn.restore:hover {
+    border-color: #3fb950;
+  }
+
+  .action-btn.restore:hover svg {
+    color: #3fb950;
+  }
+
+  /* Pagination */
+  .pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .pagination-info {
+    font-size: 14px;
+    color: var(--admin-text-secondary, #8b949e);
+  }
+
+  .pagination-buttons {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .page-btn {
+    padding: 8px 14px;
+    background: var(--admin-card, #21262d);
+    border: 1px solid var(--admin-border, #30363d);
+    border-radius: 6px;
+    color: var(--admin-text, #e6edf3);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .page-btn:hover:not(:disabled) {
+    border-color: var(--admin-text-secondary, #8b949e);
+  }
+
+  .page-btn.active {
+    background: var(--admin-primary, #ff4655);
+    border-color: var(--admin-primary, #ff4655);
+  }
+
+  .page-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .page-dots {
+    color: var(--admin-text-secondary, #8b949e);
+    padding: 0 8px;
+  }
+
+  @media (max-width: 768px) {
+    .toolbar {
+      flex-direction: column;
+    }
+
+    .search-box {
+      min-width: auto;
+    }
+
+    .table-container {
+      overflow-x: auto;
+    }
+
+    .users-table {
+      min-width: 800px;
+    }
+  }
+</style>
+

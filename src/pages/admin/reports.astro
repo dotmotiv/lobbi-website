@@ -1,0 +1,434 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getAdminSession } from '../../lib/adminAuth';
+import { getReports, getReportStats } from '../../lib/supabase';
+
+// Check admin auth - redirect if not authenticated
+const session = await getAdminSession(Astro);
+if (!session) {
+  return Astro.redirect('/admin/login');
+}
+
+// Get query params
+const page = parseInt(Astro.url.searchParams.get('page') || '1');
+const status = Astro.url.searchParams.get('status') || 'pending';
+const type = Astro.url.searchParams.get('type') || '';
+const limit = 10;
+
+// Fetch reports
+const { reports, total } = await getReports({ page, limit, status, type });
+const totalPages = Math.ceil(total / limit);
+
+// Get stats
+const stats = await getReportStats();
+
+// Format time ago
+function timeAgo(dateStr: string | null): string {
+  if (!dateStr) return 'N/A';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+  return `${Math.floor(seconds / 86400)} days ago`;
+}
+
+// Report type colors
+const reportTypeClass = (reason: string | null): string => {
+  if (!reason) return 'other';
+  const r = reason.toLowerCase();
+  if (r.includes('harass')) return 'harassment';
+  if (r.includes('spam')) return 'spam';
+  if (r.includes('fake')) return 'fake';
+  if (r.includes('underage')) return 'underage';
+  if (r.includes('inappropriate')) return 'inappropriate';
+  return 'other';
+};
+---
+
+<AdminLayout title="Reports" currentPage="reports" session={session} pendingReportsCount={stats.pending}>
+  <div class="reports-page">
+    <!-- Stats Bar -->
+    <div class="stats-bar">
+      <div class="stat-item">
+        <span class="stat-number pending">{stats.pending}</span>
+        <span class="stat-label">Pending</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-number reviewing">{stats.reviewing}</span>
+        <span class="stat-label">Under Review</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-number resolved">{stats.resolved}</span>
+        <span class="stat-label">Resolved</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-number dismissed">{stats.dismissed}</span>
+        <span class="stat-label">Dismissed</span>
+      </div>
+    </div>
+    
+    <!-- Filters -->
+    <div class="toolbar">
+      <div class="filter-tabs">
+        <a href="?status=pending" class={`tab ${status === 'pending' ? 'active' : ''}`}>Pending</a>
+        <a href="?status=reviewing" class={`tab ${status === 'reviewing' ? 'active' : ''}`}>Under Review</a>
+        <a href="?status=resolved" class={`tab ${status === 'resolved' ? 'active' : ''}`}>Resolved</a>
+        <a href="?status=all" class={`tab ${status === 'all' ? 'active' : ''}`}>All</a>
+      </div>
+      <select class="filter-select" onchange={`window.location.href='?status=${status}&type=' + this.value`}>
+        <option value="">All Types</option>
+        <option value="harassment" selected={type === 'harassment'}>Harassment</option>
+        <option value="spam" selected={type === 'spam'}>Spam</option>
+        <option value="fake" selected={type === 'fake'}>Fake Profile</option>
+        <option value="underage" selected={type === 'underage'}>Underage</option>
+        <option value="inappropriate" selected={type === 'inappropriate'}>Inappropriate</option>
+      </select>
+    </div>
+    
+    <!-- Reports List -->
+    <div class="reports-list">
+      {reports.length === 0 ? (
+        <div class="empty-state">
+          <p>No reports found</p>
+        </div>
+      ) : (
+        reports.map((report: any) => (
+          <a href={`/admin/reports/${report.id}`} class="report-row">
+            <div class={`report-type ${reportTypeClass(report.reason)}`}>{report.reason || 'Other'}</div>
+            <div class="report-info">
+              <span class="report-id">#{report.id.slice(0, 8)}</span>
+              <span class="report-users">
+                {report.reportedUser?.gamertag || report.reportedUser?.name || 'Unknown'} 
+                → reported by {report.reporter?.gamertag || report.reporter?.name || 'Unknown'}
+              </span>
+            </div>
+            <span class="report-time">{timeAgo(report.created_at)}</span>
+            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </a>
+        ))
+      )}
+    </div>
+    
+    <!-- Pagination -->
+    {totalPages > 1 && (
+      <div class="pagination">
+        <span class="page-info">Showing {((page - 1) * limit) + 1}-{Math.min(page * limit, total)} of {total} reports</span>
+        <div class="page-controls">
+          {page > 1 && (
+            <a href={`?page=${page - 1}&status=${status}&type=${type}`} class="page-btn">Previous</a>
+          )}
+          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+            const pageNum = i + 1;
+            return (
+              <a 
+                href={`?page=${pageNum}&status=${status}&type=${type}`} 
+                class={`page-btn ${pageNum === page ? 'active' : ''}`}
+              >
+                {pageNum}
+              </a>
+            );
+          })}
+          {totalPages > 5 && <span class="page-dots">...</span>}
+          {page < totalPages && (
+            <a href={`?page=${page + 1}&status=${status}&type=${type}`} class="page-btn">Next</a>
+          )}
+        </div>
+      </div>
+    )}
+  </div>
+</AdminLayout>
+
+<style>
+  .reports-page {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* Stats Bar */
+  .stats-bar {
+    display: flex;
+    gap: 32px;
+    padding: 20px 24px;
+    background: rgba(22, 27, 34, 0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+  }
+
+  .stat-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .stat-number {
+    font-size: 24px;
+    font-weight: 700;
+    font-family: 'Clash Display', sans-serif;
+  }
+
+  .stat-number.pending { color: #f85149; }
+  .stat-number.reviewing { color: #d29922; }
+  .stat-number.resolved { color: #3fb950; }
+  .stat-number.dismissed { color: #8b949e; }
+
+  .stat-label {
+    font-size: 13px;
+    color: var(--admin-text-secondary, #8b949e);
+  }
+
+  /* Empty State */
+  .empty-state {
+    padding: 48px 24px;
+    text-align: center;
+    color: var(--admin-text-secondary, #8b949e);
+    font-size: 15px;
+    background: rgba(22, 27, 34, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+  }
+
+  /* Toolbar */
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .filter-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: rgba(22, 27, 34, 0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+  }
+
+  .tab {
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    border-radius: 8px;
+    color: var(--admin-text-secondary, #8b949e);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+  }
+
+  .tab:hover {
+    color: var(--admin-text, #e6edf3);
+  }
+
+  .tab.active {
+    background: var(--admin-primary, #ff4655);
+    color: white;
+  }
+
+  .filter-select {
+    padding: 10px 32px 10px 16px;
+    background: rgba(22, 27, 34, 0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    color: var(--admin-text, #e6edf3);
+    font-size: 13px;
+    cursor: pointer;
+    outline: none;
+    text-align: center;
+    text-align-last: center;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+  }
+
+  .filter-select:hover {
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  /* Reports List */
+  .reports-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .report-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    background: rgba(22, 27, 34, 0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+  }
+
+  .report-row:hover {
+    background: rgba(22, 27, 34, 0.8);
+    border-color: rgba(255, 255, 255, 0.1);
+    transform: translateX(4px);
+  }
+
+  .report-type {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+
+  .report-type.harassment {
+    background: rgba(248, 81, 73, 0.15);
+    color: #f85149;
+  }
+
+  .report-type.spam {
+    background: rgba(210, 153, 34, 0.15);
+    color: #d29922;
+  }
+
+  .report-type.underage {
+    background: rgba(163, 113, 247, 0.15);
+    color: #a371f7;
+  }
+
+  .report-type.fake {
+    background: rgba(56, 139, 253, 0.15);
+    color: #388bfd;
+  }
+
+  .report-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .report-id {
+    font-family: 'Clash Display', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--admin-text, #e6edf3);
+  }
+
+  .report-users {
+    font-size: 13px;
+    color: var(--admin-text-secondary, #8b949e);
+  }
+
+  .report-time {
+    font-size: 12px;
+    color: var(--admin-text-secondary, #8b949e);
+    white-space: nowrap;
+  }
+
+  .chevron {
+    width: 18px;
+    height: 18px;
+    color: var(--admin-text-secondary, #8b949e);
+    transition: transform 0.2s ease;
+  }
+
+  .report-row:hover .chevron {
+    transform: translateX(4px);
+    color: var(--admin-primary, #ff4655);
+  }
+
+  /* Pagination */
+  .pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 16px;
+  }
+
+  .page-info {
+    font-size: 13px;
+    color: var(--admin-text-secondary, #8b949e);
+  }
+
+  .page-controls {
+    display: flex;
+    gap: 8px;
+  }
+
+  .page-btn {
+    padding: 8px 14px;
+    background: rgba(22, 27, 34, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    color: var(--admin-text-secondary, #8b949e);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .page-btn:hover:not(:disabled) {
+    background: rgba(22, 27, 34, 0.8);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: var(--admin-text, #e6edf3);
+  }
+
+  .page-btn.active {
+    background: var(--admin-primary, #ff4655);
+    border-color: var(--admin-primary, #ff4655);
+    color: white;
+  }
+
+  .page-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  @media (max-width: 768px) {
+    .toolbar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .filter-tabs {
+      overflow-x: auto;
+    }
+
+    .report-row {
+      flex-wrap: wrap;
+    }
+
+    .report-info {
+      order: 3;
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    .pagination {
+      flex-direction: column;
+      gap: 16px;
+    }
+  }
+</style>
+
+<script>
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+    });
+  });
+</script>
