@@ -1,8 +1,23 @@
 ---
 import { createSupabaseServerClient } from '../../../lib/supabase-ssr';
 
+// Check for environment variables first (required for Vercel serverless)
+const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL || process.env.PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || process.env.PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('Supabase environment variables not available in callback');
+  return Astro.redirect('/admin/login?error=auth_failed&details=Configuration error');
+}
+
 // Create SSR client that can read/write cookies
-const supabase = createSupabaseServerClient(Astro.cookies, Astro.request);
+let supabase;
+try {
+  supabase = createSupabaseServerClient(Astro.cookies, Astro.request);
+} catch (error) {
+  console.error('Failed to create Supabase client:', error);
+  return Astro.redirect('/admin/login?error=auth_failed&details=Configuration error');
+}
 
 // Get the auth code from URL (PKCE flow)
 const code = Astro.url.searchParams.get('code');
