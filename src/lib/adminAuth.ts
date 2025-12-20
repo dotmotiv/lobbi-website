@@ -18,9 +18,9 @@ export interface AdminSession {
  */
 export async function getAdminSession(Astro: AstroGlobal): Promise<AdminSession | null> {
   try {
-    // Check if environment variables are set
-    const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+    // Check if environment variables are set (try import.meta.env first, fallback to process.env for serverless)
+    const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL || process.env.PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || process.env.PUBLIC_SUPABASE_ANON_KEY;
     
     if (!supabaseUrl || !supabaseAnonKey) {
       console.error('Supabase environment variables not set');

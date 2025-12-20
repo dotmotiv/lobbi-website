@@ -2,19 +2,26 @@ import { createServerClient, createBrowserClient } from '@supabase/ssr';
 import type { AstroCookies } from 'astro';
 import type { Database } from './database.types';
 
-const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
-
-// Get the project ref from URL for cookie naming
-const projectRef = supabaseUrl?.match(/https:\/\/([^.]+)\./)?.[1] || 'sb';
+// Note: Environment variables are now read inside functions to ensure they're available at runtime
 
 /**
  * Create a Supabase client for server-side use (Astro pages/API routes)
  */
 export function createSupabaseServerClient(cookies: AstroCookies, request?: Request) {
+  // Try import.meta.env first (Astro), fallback to process.env (serverless runtime)
+  const url = import.meta.env.PUBLIC_SUPABASE_URL || process.env.PUBLIC_SUPABASE_URL;
+  const key = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || process.env.PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !key) {
+    throw new Error('Supabase environment variables (PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY) are not set. Please configure them in Vercel.');
+  }
+
+  // Get the project ref from URL for cookie naming
+  const projectRef = url.match(/https:\/\/([^.]+)\./)?.[1] || 'sb';
+
   return createServerClient<Database>(
-    supabaseUrl || '',
-    supabaseAnonKey || '',
+    url,
+    key,
     {
       cookies: {
         getAll() {
@@ -79,9 +86,17 @@ export function createSupabaseServerClient(cookies: AstroCookies, request?: Requ
  * Create a Supabase client for browser-side use with cookie storage
  */
 export function createSupabaseBrowserClient() {
+  // Try import.meta.env first (Astro), fallback to process.env (serverless runtime)
+  const url = import.meta.env.PUBLIC_SUPABASE_URL || process.env.PUBLIC_SUPABASE_URL;
+  const key = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || process.env.PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !key) {
+    throw new Error('Supabase environment variables (PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY) are not set. Please configure them in Vercel.');
+  }
+
   return createBrowserClient<Database>(
-    supabaseUrl || '',
-    supabaseAnonKey || '',
+    url,
+    key,
     {
       cookies: {
         getAll() {
