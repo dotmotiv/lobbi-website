@@ -232,46 +232,103 @@ if (details) {
     ? 'https://lobbiapp.com/admin/auth/callback'
     : `${window.location.origin}/admin/auth/callback`;
 
+  console.log('Configured redirectTo:', redirectTo);
+
+  // Helper function to fix OAuth URL redirect
+  function fixOAuthRedirect(oauthUrl, correctRedirect) {
+    try {
+      const urlObj = new URL(oauthUrl);
+      const redirectParam = urlObj.searchParams.get('redirect_to');
+      
+      // Check if redirect is using mobile deep link instead of web URL
+      if (redirectParam && redirectParam.startsWith('lobbi://')) {
+        console.log('Fixing mobile deep link redirect:', redirectParam, '->', correctRedirect);
+        urlObj.searchParams.set('redirect_to', correctRedirect);
+        return urlObj.toString();
+      }
+      
+      return oauthUrl;
+    } catch (err) {
+      console.error('Error fixing OAuth URL:', err);
+      return oauthUrl;
+    }
+  }
+
   // Google Login
   document.getElementById('googleLogin')?.addEventListener('click', async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { 
-        redirectTo,
-        queryParams: {
-          redirect_to: redirectTo
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { 
+          redirectTo: redirectTo,
+          skipBrowserRedirect: true  // We'll handle redirect manually
         }
+      });
+      
+      if (error) {
+        console.error('Google login error:', error);
+        return;
       }
-    });
-    if (error) console.error('Google login error:', error);
+      
+      if (data?.url) {
+        console.log('OAuth URL generated:', data.url);
+        const fixedUrl = fixOAuthRedirect(data.url, redirectTo);
+        console.log('Redirecting to:', fixedUrl);
+        window.location.href = fixedUrl;
+      }
+    } catch (err) {
+      console.error('OAuth exception:', err);
+    }
   });
 
   // Apple Login
   document.getElementById('appleLogin')?.addEventListener('click', async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'apple',
-      options: { 
-        redirectTo,
-        queryParams: {
-          redirect_to: redirectTo
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'apple',
+        options: { 
+          redirectTo: redirectTo,
+          skipBrowserRedirect: true
         }
+      });
+      
+      if (error) {
+        console.error('Apple login error:', error);
+        return;
       }
-    });
-    if (error) console.error('Apple login error:', error);
+      
+      if (data?.url) {
+        const fixedUrl = fixOAuthRedirect(data.url, redirectTo);
+        window.location.href = fixedUrl;
+      }
+    } catch (err) {
+      console.error('OAuth exception:', err);
+    }
   });
 
   // Discord Login
   document.getElementById('discordLogin')?.addEventListener('click', async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'discord',
-      options: { 
-        redirectTo,
-        queryParams: {
-          redirect_to: redirectTo
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'discord',
+        options: { 
+          redirectTo: redirectTo,
+          skipBrowserRedirect: true
         }
+      });
+      
+      if (error) {
+        console.error('Discord login error:', error);
+        return;
       }
-    });
-    if (error) console.error('Discord login error:', error);
+      
+      if (data?.url) {
+        const fixedUrl = fixOAuthRedirect(data.url, redirectTo);
+        window.location.href = fixedUrl;
+      }
+    } catch (err) {
+      console.error('OAuth exception:', err);
+    }
   });
 </script>
 
