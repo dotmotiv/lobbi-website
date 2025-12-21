@@ -186,11 +186,13 @@ export async function getReports(options: {
   limit?: number;
   status?: string;
   type?: string;
+  client?: any; // Optional Supabase client with admin session context
 } = {}) {
-  const { page = 1, limit = 10, status, type } = options;
+  const { page = 1, limit = 10, status, type, client } = options;
+  const dbClient = client || supabase; // Use provided client or fallback to default
   const offset = (page - 1) * limit;
 
-  let query = supabase
+  let query = dbClient
     .from('reports')
     .select('*', { count: 'exact' })
     .order('created_at', { ascending: false });
@@ -219,7 +221,7 @@ export async function getReports(options: {
     userIds.add(r.reporter_id);
   });
 
-  const { data: profiles } = await supabase
+  const { data: profiles } = await dbClient
     .from('profiles')
     .select('id, name, email, gamertag, avatar, created_at')
     .in('id', Array.from(userIds));
@@ -238,8 +240,9 @@ export async function getReports(options: {
   return { reports: reportsWithUsers, total: count || 0 };
 }
 
-export async function getReportById(reportId: string) {
-  const { data: report, error } = await supabase
+export async function getReportById(reportId: string, client?: any) {
+  const dbClient = client || supabase; // Use provided client or fallback to default
+  const { data: report, error } = await dbClient
     .from('reports')
     .select('*')
     .eq('id', reportId)
@@ -250,11 +253,16 @@ export async function getReportById(reportId: string) {
     return null;
   }
 
-  // Get profiles
-  const { data: profiles } = await supabase
+  // Get profiles (including reviewer if exists)
+  const userIds = [report.reported_user_id, report.reporter_id];
+  if (report.reviewed_by) {
+    userIds.push(report.reviewed_by);
+  }
+  
+  const { data: profiles } = await dbClient
     .from('profiles')
     .select('*')
-    .in('id', [report.reported_user_id, report.reporter_id]);
+    .in('id', userIds);
 
   const profileMap: Record<string, Profile> = {};
   profiles?.forEach(p => {
@@ -262,7 +270,7 @@ export async function getReportById(reportId: string) {
   });
 
   // Get report count for reported user
-  const { count: reportCount } = await supabase
+  const { count: reportCount } = await dbClient
     .from('reports')
     .select('*', { count: 'exact', head: true })
     .eq('reported_user_id', report.reported_user_id);
@@ -271,6 +279,7 @@ export async function getReportById(reportId: string) {
     ...report,
     reportedUser: profileMap[report.reported_user_id] || null,
     reporter: profileMap[report.reporter_id] || null,
+    reviewer: report.reviewed_by ? (profileMap[report.reviewed_by] || null) : null,
     reportedUserReportCount: reportCount || 0
   };
 }
@@ -364,17 +373,18 @@ export async function getRecentActivity(limit = 10) {
 // REPORT STATS
 // ============================================
 
-export async function getReportStats() {
+export async function getReportStats(client?: any) {
+  const dbClient = client || supabase; // Use provided client or fallback to default
   const [
     { count: pending },
     { count: reviewing },
     { count: resolved },
     { count: dismissed }
   ] = await Promise.all([
-    supabase.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-    supabase.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'reviewing'),
-    supabase.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'resolved'),
-    supabase.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'dismissed')
+    dbClient.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+    dbClient.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'reviewing'),
+    dbClient.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'resolved'),
+    dbClient.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'dismissed')
   ]);
 
   return {

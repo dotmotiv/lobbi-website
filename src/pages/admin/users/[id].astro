@@ -1,13 +1,17 @@
 ---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getAdminSession } from '../../../lib/adminAuth';
-import { getUserById, getReportStats, supabase } from '../../../lib/supabase';
+import { getUserById, getReportStats } from '../../../lib/supabase';
+import { createSupabaseServerClient } from '../../../lib/supabase-ssr';
 
 // Check admin auth - redirect if not authenticated
 const session = await getAdminSession(Astro);
 if (!session) {
   return Astro.redirect('/admin/login');
 }
+
+// Create SSR client with admin session
+const supabase = createSupabaseServerClient(Astro.cookies, Astro.request);
 
 const { id } = Astro.params;
 
@@ -20,7 +24,7 @@ if (!user) {
 }
 
 // Get report stats for sidebar badge
-const reportStats = await getReportStats();
+const reportStats = await getReportStats(supabase);
 
 // Get reports for this user
 const { data: userReports } = await supabase
@@ -61,6 +65,30 @@ function formatDateTime(dateStr: string | null) {
     hour: '2-digit',
     minute: '2-digit'
   });
+}
+
+// Report type class mapping
+function getReportTypeClass(reason: string | null): string {
+  if (!reason) return 'other';
+  const r = reason.toLowerCase();
+  if (r.includes('harass')) return 'harassment';
+  if (r.includes('spam') || r.includes('bot')) return 'spam';
+  if (r.includes('suspicious') || r.includes('fake')) return 'fake';
+  if (r.includes('inappropriate')) return 'inappropriate';
+  if (r.includes('well-being') || r.includes('wellbeing') || r.includes('well being')) return 'wellbeing';
+  return 'other';
+}
+
+// Format report reason for display
+function formatReportReason(reason: string | null): string {
+  if (!reason) return 'Other';
+  const r = reason.toLowerCase();
+  if (r.includes('suspicious') || r.includes('fake')) return 'Suspicious Profile';
+  if (r.includes('harass')) return 'Harassment';
+  if (r.includes('spam') || r.includes('bot')) return 'Spam / Bot';
+  if (r.includes('inappropriate')) return 'Inappropriate Behavior';
+  if (r.includes('well-being') || r.includes('wellbeing') || r.includes('well being')) return 'Well-being Concern';
+  return reason.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
 }
 ---
 
@@ -180,8 +208,8 @@ function formatDateTime(dateStr: string | null) {
           <div class="reports-list">
             {userReports.map((report: any) => (
               <a href={`/admin/reports/${report.id}`} class="report-item">
-                <div class={`report-type ${report.reason?.toLowerCase() || 'other'}`}>
-                  {report.reason || 'Other'}
+                <div class={`report-type ${getReportTypeClass(report.reason)}`}>
+                  {formatReportReason(report.reason)}
                 </div>
                 <div class="report-info">
                   <span class="report-status">{report.status}</span>
@@ -429,6 +457,16 @@ function formatDateTime(dateStr: string | null) {
   .report-type.other {
     background: rgba(125, 133, 144, 0.15);
     color: var(--admin-text-secondary, #8b949e);
+  }
+
+  .report-type.wellbeing {
+    background: rgba(255, 123, 172, 0.15);
+    color: #ff7bac;
+  }
+
+  .report-type.inappropriate {
+    background: rgba(255, 167, 87, 0.15);
+    color: #ffa757;
   }
 
   .report-info {

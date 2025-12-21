@@ -12,7 +12,7 @@ if (session) {
 const error = Astro.url.searchParams.get('error');
 const details = Astro.url.searchParams.get('details');
 const errorMessages: Record<string, string> = {
-  'not_admin': 'Your account does not have admin access. Make sure you are added to admin_users table.',
+  'not_admin': 'Your account does not have admin access. Please contact support for assistance.',
   'auth_failed': 'Authentication failed. Please try again.',
 };
 let errorMessage = error ? errorMessages[error] || 'An error occurred.' : null;

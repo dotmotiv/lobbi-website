@@ -2,6 +2,7 @@
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import { getAdminSession } from '../../lib/adminAuth';
 import { getReports, getReportStats } from '../../lib/supabase';
+import { createSupabaseServerClient } from '../../lib/supabase-ssr';
 
 // Check admin auth - redirect if not authenticated
 const session = await getAdminSession(Astro);
@@ -9,18 +10,21 @@ if (!session) {
   return Astro.redirect('/admin/login');
 }
 
+// Create SSR client with admin session
+const supabase = createSupabaseServerClient(Astro.cookies, Astro.request);
+
 // Get query params
 const page = parseInt(Astro.url.searchParams.get('page') || '1');
 const status = Astro.url.searchParams.get('status') || 'pending';
 const type = Astro.url.searchParams.get('type') || '';
 const limit = 10;
 
-// Fetch reports
-const { reports, total } = await getReports({ page, limit, status, type });
+// Fetch reports with admin client
+const { reports, total } = await getReports({ page, limit, status, type, client: supabase });
 const totalPages = Math.ceil(total / limit);
 
-// Get stats
-const stats = await getReportStats();
+// Get stats with admin client
+const stats = await getReportStats(supabase);
 
 // Format time ago
 function timeAgo(dateStr: string | null): string {
@@ -40,12 +44,25 @@ const reportTypeClass = (reason: string | null): string => {
   if (!reason) return 'other';
   const r = reason.toLowerCase();
   if (r.includes('harass')) return 'harassment';
-  if (r.includes('spam')) return 'spam';
-  if (r.includes('fake')) return 'fake';
-  if (r.includes('underage')) return 'underage';
+  if (r.includes('spam') || r.includes('bot')) return 'spam';
+  if (r.includes('suspicious') || r.includes('fake')) return 'fake';
   if (r.includes('inappropriate')) return 'inappropriate';
+  if (r.includes('well-being') || r.includes('wellbeing') || r.includes('well being')) return 'wellbeing';
   return 'other';
 };
+
+// Format report reason for display
+function formatReportReason(reason: string | null): string {
+  if (!reason) return 'Other';
+  const r = reason.toLowerCase();
+  if (r.includes('suspicious') || r.includes('fake')) return 'Suspicious Profile';
+  if (r.includes('harass')) return 'Harassment';
+  if (r.includes('spam') || r.includes('bot')) return 'Spam / Bot';
+  if (r.includes('inappropriate')) return 'Inappropriate Behavior';
+  if (r.includes('well-being') || r.includes('wellbeing') || r.includes('well being')) return 'Well-being Concern';
+  // Return formatted version of the reason (replace underscores with spaces, title case)
+  return reason.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+}
 ---
 
 <AdminLayout title="Reports" currentPage="reports" session={session} pendingReportsCount={stats.pending}>
@@ -81,10 +98,10 @@ const reportTypeClass = (reason: string | null): string => {
       <select class="filter-select" onchange={`window.location.href='?status=${status}&type=' + this.value`}>
         <option value="">All Types</option>
         <option value="harassment" selected={type === 'harassment'}>Harassment</option>
-        <option value="spam" selected={type === 'spam'}>Spam</option>
-        <option value="fake" selected={type === 'fake'}>Fake Profile</option>
-        <option value="underage" selected={type === 'underage'}>Underage</option>
-        <option value="inappropriate" selected={type === 'inappropriate'}>Inappropriate</option>
+        <option value="spam" selected={type === 'spam'}>Spam / Bot</option>
+        <option value="fake" selected={type === 'fake'}>Suspicious Profile</option>
+        <option value="inappropriate" selected={type === 'inappropriate'}>Inappropriate Behavior</option>
+        <option value="wellbeing" selected={type === 'wellbeing'}>Well-being Concern</option>
       </select>
     </div>
     
@@ -97,7 +114,7 @@ const reportTypeClass = (reason: string | null): string => {
       ) : (
         reports.map((report: any) => (
           <a href={`/admin/reports/${report.id}`} class="report-row">
-            <div class={`report-type ${reportTypeClass(report.reason)}`}>{report.reason || 'Other'}</div>
+            <div class={`report-type ${reportTypeClass(report.reason)}`}>{formatReportReason(report.reason)}</div>
             <div class="report-info">
               <span class="report-id">#{report.id.slice(0, 8)}</span>
               <span class="report-users">
@@ -245,8 +262,8 @@ const reportTypeClass = (reason: string | null): string => {
     font-size: 13px;
     cursor: pointer;
     outline: none;
-    text-align: center;
-    text-align-last: center;
+    text-align: left;
+    text-align-last: left;
     appearance: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
@@ -312,6 +329,16 @@ const reportTypeClass = (reason: string | null): string => {
   .report-type.fake {
     background: rgba(56, 139, 253, 0.15);
     color: #388bfd;
+  }
+
+  .report-type.wellbeing {
+    background: rgba(255, 123, 172, 0.15);
+    color: #ff7bac;
+  }
+
+  .report-type.inappropriate {
+    background: rgba(255, 167, 87, 0.15);
+    color: #ffa757;
   }
 
   .report-info {

@@ -2,12 +2,16 @@
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import { getAdminSession } from '../../lib/adminAuth';
 import { getUsers, getReportStats } from '../../lib/supabase';
+import { createSupabaseServerClient } from '../../lib/supabase-ssr';
 
 // Check admin auth - redirect if not authenticated
 const session = await getAdminSession(Astro);
 if (!session) {
   return Astro.redirect('/admin/login');
 }
+
+// Create SSR client with admin session
+const supabase = createSupabaseServerClient(Astro.cookies, Astro.request);
 
 // Get query params
 const page = parseInt(Astro.url.searchParams.get('page') || '1');
@@ -18,7 +22,7 @@ const limit = 10;
 // Fetch users
 const { users, total } = await getUsers({ page, limit, search, sortBy });
 const totalPages = Math.ceil(total / limit);
-const reportStats = await getReportStats();
+const reportStats = await getReportStats(supabase);
 
 // Format date
 function formatDate(dateStr: string | null): string {

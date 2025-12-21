@@ -2,6 +2,7 @@
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getAdminSession } from '../../../lib/adminAuth';
 import { getReportById, getReportStats } from '../../../lib/supabase';
+import { createSupabaseServerClient } from '../../../lib/supabase-ssr';
 
 // Check admin auth - redirect if not authenticated
 const session = await getAdminSession(Astro);
@@ -9,10 +10,13 @@ if (!session) {
   return Astro.redirect('/admin/login');
 }
 
+// Create SSR client with admin session
+const supabase = createSupabaseServerClient(Astro.cookies, Astro.request);
+
 const { id } = Astro.params;
 
-// Fetch report from database
-const report = await getReportById(id as string);
+// Fetch report from database with admin client
+const report = await getReportById(id as string, supabase);
 
 // Redirect if not found
 if (!report) {
@@ -20,7 +24,7 @@ if (!report) {
 }
 
 // Get report stats for sidebar badge
-const reportStats = await getReportStats();
+const reportStats = await getReportStats(supabase);
 
 // Helper functions
 function formatDate(dateStr: string | null) {
@@ -46,11 +50,34 @@ function getReportTypeClass(reason: string | null): string {
   if (!reason) return 'other';
   const r = reason.toLowerCase();
   if (r.includes('harass')) return 'harassment';
-  if (r.includes('spam')) return 'spam';
-  if (r.includes('fake')) return 'fake';
-  if (r.includes('underage')) return 'underage';
+  if (r.includes('spam') || r.includes('bot')) return 'spam';
+  if (r.includes('suspicious') || r.includes('fake')) return 'fake';
   if (r.includes('inappropriate')) return 'inappropriate';
+  if (r.includes('well-being') || r.includes('wellbeing') || r.includes('well being')) return 'wellbeing';
   return 'other';
+}
+
+function formatReportReason(reason: string | null): string {
+  if (!reason) return 'Other';
+  const r = reason.toLowerCase();
+  if (r.includes('suspicious') || r.includes('fake')) return 'Suspicious Profile';
+  if (r.includes('harass')) return 'Harassment';
+  if (r.includes('spam') || r.includes('bot')) return 'Spam / Bot';
+  if (r.includes('inappropriate')) return 'Inappropriate Behavior';
+  if (r.includes('well-being') || r.includes('wellbeing') || r.includes('well being')) return 'Well-being Concern';
+  // Return formatted version of the reason (replace underscores with spaces, title case)
+  return reason.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+}
+
+function formatActionTaken(action: string | null): string {
+  if (!action) return 'No action';
+  const actions: Record<string, string> = {
+    'dismiss': 'Report Dismissed',
+    'warn_user': 'User Warned',
+    'suspend_7d': 'Suspended for 7 Days',
+    'banned': 'Permanently Banned'
+  };
+  return actions[action] || action;
 }
 ---
 
@@ -67,7 +94,7 @@ function getReportTypeClass(reason: string | null): string {
     <!-- Report Header -->
     <div class="report-header">
       <div class="header-left">
-        <div class={`report-type ${getReportTypeClass(report.reason)}`}>{report.reason || 'Other'}</div>
+        <div class={`report-type ${getReportTypeClass(report.reason)}`}>{formatReportReason(report.reason)}</div>
         <h1 class="report-title">#{report.id.slice(0, 8)}</h1>
         <span class="report-date">{formatDate(report.created_at)}</span>
       </div>
@@ -143,10 +170,10 @@ function getReportTypeClass(reason: string | null): string {
           <h3 class="card-title">Previous Action</h3>
           <div class="actions-history">
             <div class="history-item">
-              <span class="history-action">{report.action_taken}</span>
+              <span class="history-action">{formatActionTaken(report.action_taken)}</span>
               <span class="history-meta">
                 {formatDate(report.reviewed_at)} 
-                {report.reviewed_by && `by Admin`}
+                {report.reviewed_by && `by ${report.reviewer?.name || report.reviewer?.email || 'Admin'}`}
               </span>
               {report.admin_notes && (
                 <p class="history-notes">{report.admin_notes}</p>
@@ -267,6 +294,16 @@ function getReportTypeClass(reason: string | null): string {
   .report-type.fake {
     background: rgba(56, 139, 253, 0.15);
     color: #388bfd;
+  }
+
+  .report-type.wellbeing {
+    background: rgba(255, 123, 172, 0.15);
+    color: #ff7bac;
+  }
+
+  .report-type.inappropriate {
+    background: rgba(255, 167, 87, 0.15);
+    color: #ffa757;
   }
 
   .report-title {
@@ -620,4 +657,77 @@ function getReportTypeClass(reason: string | null): string {
     }
   }
 </style>
+
+<script>
+  import { createSupabaseBrowserClient } from '../../../lib/supabase-ssr';
+  
+  const supabase = createSupabaseBrowserClient();
+  const actionsBar = document.querySelector('.actions-bar');
+  
+  if (actionsBar) {
+    const reportId = actionsBar.dataset.reportId;
+    const actionButtons = actionsBar.querySelectorAll('.action-btn');
+    
+    // Map action to status and action_taken (standardized DB values)
+    const actionMap: Record<string, { status: string; action_taken: string }> = {
+      dismiss: { status: 'dismissed', action_taken: 'dismiss' },
+      warn: { status: 'resolved', action_taken: 'warn_user' },
+      suspend: { status: 'resolved', action_taken: 'suspend_7d' },
+      ban: { status: 'resolved', action_taken: 'banned' }
+    };
+    
+    // Display text for success messages
+    const displayMap: Record<string, string> = {
+      dismiss: 'Report Dismissed',
+      warn: 'User Warned',
+      suspend: 'Suspended for 7 Days',
+      ban: 'Permanently Banned'
+    };
+    
+    actionButtons.forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const action = (btn as HTMLElement).dataset.action;
+        const actionText = btn.textContent?.trim();
+        const config = action ? actionMap[action] : null;
+        
+        if (!config || !action) return;
+        
+        // Confirm action
+        if (!confirm(`Are you sure you want to "${actionText}"? This action cannot be undone.`)) {
+          return;
+        }
+        
+        // Disable all buttons
+        actionButtons.forEach(b => (b as HTMLButtonElement).disabled = true);
+        btn.textContent = 'Processing...';
+        
+        try {
+          // Get current user
+          const { data: { user } } = await supabase.auth.getUser();
+          
+          // Update the report directly
+          const { error } = await supabase
+            .from('reports')
+            .update({
+              status: config.status,
+              action_taken: config.action_taken,
+              reviewed_at: new Date().toISOString(),
+              reviewed_by: user?.id || null
+            })
+            .eq('id', reportId);
+          
+          if (error) throw error;
+          
+          alert(`Action completed: ${displayMap[action]}`);
+          window.location.href = '/admin/reports';
+        } catch (error) {
+          console.error('Error:', error);
+          alert('Error processing action. Please try again.');
+          actionButtons.forEach(b => (b as HTMLButtonElement).disabled = false);
+          btn.textContent = actionText || '';
+        }
+      });
+    });
+  }
+</script>
 

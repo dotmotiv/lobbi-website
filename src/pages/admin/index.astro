@@ -2,6 +2,7 @@
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import { getAdminSession } from '../../lib/adminAuth';
 import { getDashboardStats, getRecentActivity, getReports, getReportStats } from '../../lib/supabase';
+import { createSupabaseServerClient } from '../../lib/supabase-ssr';
 
 // Check admin auth - redirect if not authenticated
 const session = await getAdminSession(Astro);
@@ -9,11 +10,14 @@ if (!session) {
   return Astro.redirect('/admin/login');
 }
 
+// Create SSR client with admin session
+const supabase = createSupabaseServerClient(Astro.cookies, Astro.request);
+
 // Fetch dashboard data
 const stats = await getDashboardStats();
 const recentActivity = await getRecentActivity(5);
-const { reports: pendingReports } = await getReports({ status: 'pending', limit: 5 });
-const reportStats = await getReportStats();
+const { reports: pendingReports } = await getReports({ status: 'pending', limit: 5, client: supabase });
+const reportStats = await getReportStats(supabase);
 
 // Helper to format time ago
 function timeAgo(dateStr: string): string {
@@ -25,6 +29,30 @@ function timeAgo(dateStr: string): string {
   if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
   if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
   return `${Math.floor(seconds / 86400)} days ago`;
+}
+
+// Report type class mapping
+function getReportTypeClass(reason: string | null): string {
+  if (!reason) return 'other';
+  const r = reason.toLowerCase();
+  if (r.includes('harass')) return 'harassment';
+  if (r.includes('spam') || r.includes('bot')) return 'spam';
+  if (r.includes('suspicious') || r.includes('fake')) return 'fake';
+  if (r.includes('inappropriate')) return 'inappropriate';
+  if (r.includes('well-being') || r.includes('wellbeing') || r.includes('well being')) return 'wellbeing';
+  return 'other';
+}
+
+// Format report reason for display
+function formatReportReason(reason: string | null): string {
+  if (!reason) return 'Other';
+  const r = reason.toLowerCase();
+  if (r.includes('suspicious') || r.includes('fake')) return 'Suspicious Profile';
+  if (r.includes('harass')) return 'Harassment';
+  if (r.includes('spam') || r.includes('bot')) return 'Spam / Bot';
+  if (r.includes('inappropriate')) return 'Inappropriate Behavior';
+  if (r.includes('well-being') || r.includes('wellbeing') || r.includes('well being')) return 'Well-being Concern';
+  return reason.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
 }
 ---
 
@@ -133,8 +161,8 @@ function timeAgo(dateStr: string): string {
           ) : (
             pendingReports.map((report: any) => (
               <div class="report-item">
-                <div class={`report-type ${report.reason?.toLowerCase() || 'other'}`}>
-                  {report.reason || 'Other'}
+                <div class={`report-type ${getReportTypeClass(report.reason)}`}>
+                  {formatReportReason(report.reason)}
                 </div>
                 <div class="report-content">
                   <p class="report-text">{report.details?.slice(0, 50) || 'No details provided'}...</p>
@@ -410,6 +438,16 @@ function timeAgo(dateStr: string): string {
   .report-type.fake {
     background: rgba(163, 113, 247, 0.15);
     color: #a371f7;
+  }
+
+  .report-type.wellbeing {
+    background: rgba(255, 123, 172, 0.15);
+    color: #ff7bac;
+  }
+
+  .report-type.inappropriate {
+    background: rgba(255, 167, 87, 0.15);
+    color: #ffa757;
   }
 
   .report-content {
